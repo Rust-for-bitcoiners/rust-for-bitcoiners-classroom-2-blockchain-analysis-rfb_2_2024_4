@@ -5,6 +5,10 @@ use chrono::Duration;
 #[macro_use]
 extern crate lazy_static;
 
+// bcrt1qeqywuu02z9kmahnausmcy66dwncttmpkzk3dtl
+// bcrt1qhesylqc42aaym37xdsuhdtp4acyayudpc7guzh
+// bcrt1qyz0z55uc68qsesxlyu5392khlxv8454lr2a935
+
 lazy_static! {
     static ref RPC_CLIENT: Client = {
         dotenv::dotenv().ok();
@@ -36,7 +40,6 @@ fn time_to_mine(block_height_a: u64, block_height_b: u64) -> u32 {
     time_difference
 }
 
-// TODO: Task 2
 fn number_of_transactions(block_height: u32) -> u16 {
     const TX_COUNT: usize = 20;
     let some_value = Box::new(TX_COUNT);
