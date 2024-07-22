@@ -1,60 +1,72 @@
-use std::{env, time};
+use std::time;
 
-use bitcoincore_rpc::{json, jsonrpc::{self}, Auth, Client, RpcApi};
+use bitcoincore_rpc::{Auth, Client, RpcApi};
 use chrono::Duration;
 #[macro_use]
 extern crate lazy_static;
 
 lazy_static! {
     static ref RPC_CLIENT: Client = {
-        dotenv::dotenv().ok();
-        let rpc_url: String = env::var("BITCOIN_RPC_URL").expect("BITCOIN_RPC_URL must be set");
-        let rpc_user: String = env::var("BITCOIN_RPC_USER").expect("BITCOIN_RPC_USER must be set");
-        let rpc_password: String =
-            env::var("BITCOIN_RPC_PASSWORD").expect("BITCOIN_RPC_PASSWORD must be set");
+        // Directly assigning the RPC details
+        let rpc_url = "http://127.0.0.1:18443".to_string();
+        let rpc_user = "polaruser".to_string();
+        let rpc_password = "polarpass".to_string();
         Client::new(&rpc_url, Auth::UserPass(rpc_user, rpc_password)).unwrap()
     };
 }
 
-// static client: Client = Client::new("url", Auth::UserPass("user".to_owned(), "password".to_owned())).unwrap();
-
-// TODO: Task 1
-fn time_to_mine(block_height: u64) -> Duration {
-    // * is a deref operator which invokes the Deref trait of the type RPC_CLIENT which was created
-    // when the lazy macro is expanded
-    // if a value has a static lifetime then it means that value lives as long as the program lives
+// Calculate the time to mine a block
+fn time_to_mine(block_height: u64) -> Result<Duration, Box<dyn std::error::Error>> {
     let rpc_client: &Client = &*RPC_CLIENT;
-    rpc_client.get_block_hash(234);
-    todo!()
+    let block_hash = rpc_client.get_block_hash(block_height)?;
+    let block = rpc_client.get_block_info(&block_hash)?;
+    let previous_block_hash = block.previousblockhash.ok_or("Previous block hash not found")?;
+    let previous_block = rpc_client.get_block_info(&previous_block_hash)?;
+
+    let time_to_mine = block.time - previous_block.time;
+    Ok(Duration::seconds(time_to_mine as i64))
 }
 
-// TODO: Task 2
-fn number_of_transactions(block_height: u64) -> u16 {
-    let some_value = Box::new(4 as u32);
-    todo!()
+// Get the number of transactions in a block
+fn number_of_transactions(block_height: u64) -> Result<u16, Box<dyn std::error::Error>> {
+    let rpc_client: &Client = &*RPC_CLIENT;
+    let block_hash = rpc_client.get_block_hash(block_height)?;
+    let block = rpc_client.get_block_info(&block_hash)?;
+
+    Ok(block.tx.len() as u16)
 }
 
-fn main() {
-    // you can use rpc_client here as if it was a global variable
-    // println!("{:?}", res);
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Demonstrate usage of the RPC client and the implemented functions
     const TIMEOUT_UTXO_SET_SCANS: time::Duration = time::Duration::from_secs(60 * 8); // 8 minutes
-    dotenv::dotenv().ok();
-        let rpc_url: String = env::var("BITCOIN_RPC_URL").expect("BITCOIN_RPC_URL must be set");
-        let rpc_user: String = env::var("BITCOIN_RPC_USER").expect("BITCOIN_RPC_USER must be set");
-        let rpc_password: String =
-            env::var("BITCOIN_RPC_PASSWORD").expect("BITCOIN_RPC_PASSWORD must be set");
 
-    let custom_timeout_transport = jsonrpc::simple_http::Builder::new()
-        .url(&rpc_url)
-        .expect("invalid rpc url")
+    let rpc_url = "http://127.0.0.1:18443".to_string();
+    let rpc_user = "polaruser".to_string();
+    let rpc_password = "polarpass".to_string();
+
+    let custom_timeout_transport = bitcoincore_rpc::jsonrpc::simple_http::Builder::new()
+        .url(&rpc_url)?
         .auth(rpc_user, Some(rpc_password))
         .timeout(TIMEOUT_UTXO_SET_SCANS)
         .build();
     let custom_timeout_rpc_client =
-        jsonrpc::client::Client::with_transport(custom_timeout_transport);
+        bitcoincore_rpc::jsonrpc::client::Client::with_transport(custom_timeout_transport);
 
     let rpc_client = Client::from_jsonrpc(custom_timeout_rpc_client);
-    let res: json::GetTxOutSetInfoResult =
-        rpc_client.get_tx_out_set_info(None, None, None).unwrap();
+    let res = rpc_client.get_tx_out_set_info(None, None, None)?;
     println!("{:?}", res);
+
+    // Example usage of the implemented functions
+    let block_height = 150; // Valid block height based on current node's height
+    match time_to_mine(block_height) {
+        Ok(mining_duration) => println!("Time to mine block {}: {:?}", block_height, mining_duration),
+        Err(e) => eprintln!("Error calculating time to mine block {}: {:?}", block_height, e),
+    }
+
+    match number_of_transactions(block_height) {
+        Ok(num_transactions) => println!("Number of transactions in block {}: {}", block_height, num_transactions),
+        Err(e) => eprintln!("Error getting number of transactions in block {}: {:?}", block_height, e),
+    }
+
+    Ok(())
 }
